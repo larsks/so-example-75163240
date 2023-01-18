@@ -1,0 +1,33 @@
+- hosts: all
+  gather_facts: false
+  tasks:
+    - name: Get Instance Inventory
+      ansible.builtin.script: "scripts/inventory.sh  {{ inventory_hostname }}"
+      register: inventory
+
+- hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: create merged inventory
+      set_fact:
+        inventory_data: "{{ inventory_data + hostvars[item].inventory.stdout }}"
+      vars:
+        inventory_data: ""
+      loop: "{{ groups.all }}"
+
+    - name: show merged inventory
+      debug:
+        var: inventory_data
+
+    - name: send to api
+      ansible.builtin.uri:
+        url: https://httpbin.org/post
+        method: POST
+        body: "{{ inventory_data }}"
+        status_code: 200
+        return_content: true
+      register: post_result
+
+    - name: verify post data
+      debug:
+        var: post_result.content|from_json
